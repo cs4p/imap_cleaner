@@ -1,5 +1,5 @@
 from imapclient import IMAPClient
-from config import imap_server,imap_user,imap_password
+from config import imap_server,imap_user,imap_password,folder_list
 
 
 def server_login(imap_server,imap_user,imap_password):
@@ -38,7 +38,6 @@ def run():
     select_info = server.select_folder('INBOX')
     print('%d messages in INBOX' % select_info[b'EXISTS'])
     print('Processing...')
-    folder_list = ['vendor','Spam','unsubscribe','social_media','Family','school']
     for fldr in folder_list:
         email_list = []
         new_messages = server.search()
