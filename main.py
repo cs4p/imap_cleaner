@@ -50,14 +50,16 @@ def run():
     server = server_login(imap_server, imap_user, imap_password)
     select_info = server.select_folder('INBOX')
     logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
+    folder_list = server.list_folders('Categories/')
     for fldr in folder_list:
+        folder_name = fldr[2]
         email_list = []
         new_messages = server.search()
-        email_list = get_folder_filter(server, fldr)
+        email_list = get_folder_filter(server, folder_name)
         select_info = server.select_folder('INBOX')
-        logging.info('Looking for new messages to move to ' + fldr)
-        p = apply_folder_filters(server, new_messages, email_list, fldr)
-        logging.info(' '.join(['Moved', str(p), 'messages to', fldr]))
+        logging.info('Looking for new messages to move to ' + folder_name)
+        p = apply_folder_filters(server, new_messages, email_list, folder_name)
+        logging.info(' '.join(['Moved', str(p), 'messages to', folder_name]))
         select_info = server.select_folder('INBOX')
         logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
