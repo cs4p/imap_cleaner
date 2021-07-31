@@ -25,8 +25,9 @@ def get_folder_filter(server, folder_name):
     for msgid, data in server.fetch(messages, ['ENVELOPE']).items():
         envelope = data[b'ENVELOPE']
         for addr in envelope.from_:
-            if addr not in email_filter_list:
-                email_filter_list.append(str(addr))
+            email_addr = '@'.join([str(addr.mailbox.decode()),str(addr.host.decode())])
+            if email_addr not in email_filter_list:
+                email_filter_list.append(email_addr)
     logging.info(' '.join(['Found', str(len(email_filter_list)), 'email addresses for', folder_name]))
     return email_filter_list
 
