@@ -29,6 +29,7 @@ def get_folder_filter(server, folder_name):
             if email_addr not in email_filter_list:
                 email_filter_list.append(email_addr)
     logging.info(' '.join(['Found', str(len(email_filter_list)), 'email addresses for', folder_name]))
+
     return email_filter_list
 
 
@@ -44,8 +45,9 @@ def apply_folder_filters(server, messages, email_list, folder_name):
 
 
 def run():
-    logging.basicConfig(filename='imap_cleaner.log', level=logging.INFO,
-                        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+                        handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()])
     logging.info('###################################################################################################')
     logging.info('Starting operation...')
     server = server_login(imap_server, imap_user, imap_password)
