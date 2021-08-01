@@ -38,7 +38,8 @@ def apply_folder_filters(server, messages, email_list, folder_name):
     for msgid, data in server.fetch(messages, ['ENVELOPE']).items():
         envelope = data[b'ENVELOPE']
         for addr in envelope.from_:
-            if str(addr) in email_list:
+            email_addr = '@'.join([str(addr.mailbox.decode()), str(addr.host.decode())])
+            if email_addr in email_list:
                 server.move(msgid, folder_name)
                 counter = counter + 1
     return counter
