@@ -1,4 +1,4 @@
 /config.py
 /venv/
-!/mailrules.json
 /mailrules.json
+/.idea
