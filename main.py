@@ -3,16 +3,16 @@ import time, json, logging
 from imapclient import IMAPClient
 from sievelib.factory import FiltersSet
 
-from config import imap_server, imap_user, imap_password, folder_list
+from config import imap_server, imap_user, imap_password
+
+from config import folder_list_order
+
+
 
 def server_login(imap_server, imap_user, imap_password):
     server = IMAPClient(imap_server, use_uid=True)
     server.login(imap_user, imap_password)
     return server
-
-
-
-
 
 def move_email(server, msg, dst_folder):
     if not server.folder_exists(dst_folder):
@@ -68,6 +68,60 @@ def createFastmailRule(email_list, dest, rule_name,):
     return r
 
 
+def clean_up_folder(target_folder):
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+        handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
+        )
+    logging.info('###################################################################################################')
+    logging.info('Starting folder clean up...')
+    server = server_login(imap_server, imap_user, imap_password)
+    email_list = get_folder_filter(server, target_folder)
+    folder_list = server.list_folders('Categories/')
+    for fldr in folder_list:
+        folder_name = fldr[2]
+        if folder_name != target_folder:
+            server.select_folder(folder_name)
+            new_messages = server.search()
+            p = apply_folder_filters(server, new_messages, email_list, folder_name)
+            logging.info(' '.join(['Moved', str(p), 'messages from', folder_name, "to", target_folder]))
+    server.logout()
+    logging.info('Finished moving messages.')
+
+def clean_all_folders():
+    for target_folder in folder_list_order:
+        clean_up_folder(target_folder)
+
+
+def create_mail_rules():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+        handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
+        )
+    logging.info('###################################################################################################')
+    logging.info('Starting operation...')
+    server = server_login(imap_server, imap_user, imap_password)
+    folder_list = server.list_folders('Categories/')
+    filter_set = FiltersSet("Rules")
+    fastmailRules = []
+    for fldr in folder_list:
+        folder_name = fldr[2]
+        email_list = get_folder_filter(server, folder_name)
+        logging.info('Adding a rule to filter set')
+        AddRuleToFilterSet(email_list,folder_name,folder_name,filter_set)
+        fastmailRules.append(createFastmailRule(email_list,folder_name,folder_name))
+    logging.info('outputting filter set')
+    rules_file = open('rules.sieve','w')
+    rules_file.write(str(filter_set.__str__()))
+    rules_file.close()
+    logging.info('outputting fastmail rules')
+    fastmail_rules_string = "[" + ",".join(fastmailRules) + "]"
+    rules_file = open('mailrules.json', 'w')
+    rules_file.write(fastmail_rules_string)
+    rules_file.close()
+
 
 def run():
     logging.basicConfig(level=logging.INFO,
@@ -79,30 +133,17 @@ def run():
     select_info = server.select_folder('INBOX')
     logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
     folder_list = server.list_folders('Categories/')
-    filter_set = FiltersSet("Rules")
-    fastmailRules = []
     for fldr in folder_list:
         folder_name = fldr[2]
         email_list = []
         new_messages = server.search()
         email_list = get_folder_filter(server, folder_name)
-        logging.info('Adding a rule to filter set')
-        AddRuleToFilterSet(email_list,folder_name,folder_name,filter_set)
-        fastmailRules.append(createFastmailRule(email_list,folder_name,folder_name))
-        select_info = server.select_folder('INBOX')
+        # select_info = server.select_folder('INBOX')
+        server.select_folder('INBOX')
         logging.info('Looking for new messages to move to ' + folder_name)
         p = apply_folder_filters(server, new_messages, email_list, folder_name)
         logging.info(' '.join(['Moved', str(p), 'messages to', folder_name]))
         select_info = server.select_folder('INBOX')
         logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
-    logging.info('outputting filter set')
-    rules_file = open('rules.sieve','w')
-    rules_file.write(str(filter_set.__str__()))
-    rules_file.close()
-    logging.info('outputting fastmail rules')
-    fastmail_rules_string = "[" + ",".join(fastmailRules) + "]"
-    rules_file = open('mailrules.json', 'w')
-    rules_file.write(fastmail_rules_string)
-    rules_file.close()
     server.logout()
