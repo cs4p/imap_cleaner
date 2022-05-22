@@ -2,3 +2,4 @@
 /venv/
 /mailrules.json
 /.idea
+*.log

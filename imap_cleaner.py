@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 import time
 
 from imapclient import IMAPClient
@@ -28,9 +29,12 @@ def get_folder_filter(server, folder_name):
     for msgid, data in server.fetch(messages, ['ENVELOPE']).items():
         envelope = data[b'ENVELOPE']
         for addr in envelope.from_:
-            email_addr = '@'.join([str(addr.mailbox.decode()), str(addr.host.decode())])
-            if email_addr not in email_filter_list:
-                email_filter_list.append(email_addr)
+            try:
+                email_addr = '@'.join([str(addr.mailbox.decode()), str(addr.host.decode())])
+                if email_addr not in email_filter_list:
+                    email_filter_list.append(email_addr)
+            except AttributeError:
+                logging.error("Attribute error on msgid " + str(msgid))
     logging.info(' '.join(['Found', str(len(email_filter_list)), 'email addresses for', folder_name]))
 
     return email_filter_list
@@ -73,11 +77,11 @@ def create_fastmail_rule(email_list, dest, rule_name, ):
 
 
 def clean_up_folder(target_folder):
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-        handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
-        )
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+    #     handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
+    #     )
     logging.info('###################################################################################################')
     logging.info('Starting folder clean up...')
     server = server_login(imap_server, imap_user, imap_password)
@@ -100,11 +104,11 @@ def clean_all_folders():
 
 
 def create_mail_rules():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-        handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
-        )
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+    #     handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
+    #     )
     logging.info('###################################################################################################')
     logging.info('Starting operation...')
     server = server_login(imap_server, imap_user, imap_password)
@@ -128,10 +132,10 @@ def create_mail_rules():
     rules_file.close()
 
 
-def run():
+def main():
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+        format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
         handlers=[logging.FileHandler('imap_cleaner.log'), logging.StreamHandler()]
         )
     logging.info('###################################################################################################')
@@ -152,3 +156,6 @@ def run():
         logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
     server.logout()
+
+if __name__ == '__main__':
+    sys.exit(main())

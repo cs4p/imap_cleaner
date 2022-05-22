@@ -1,17 +1,22 @@
-FROM python:3.8-slim-buster
+FROM ubuntu:latest
 
 # set a directory for the app
 WORKDIR /usr/src/app
 
 # install Python requirements
+RUN apt update && apt-get upgrade -y
+RUN apt install -y --no-install-recommends cron python3 python3-dev python3-venv
+RUN python3 -m venv venv
+ENV PATH="/usr/src/app/venv/bin:$PATH"
 COPY requirements.txt /usr/src/app/
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY main.py /usr/src/app
+# Crontab file copied to cron.d directory.
+COPY crontab.file /etc/cron.d/container_cronjob
+
+# Script file copied into container.
+COPY imap_cleaner.py /usr/src/app
 COPY config.py /usr/src/app
-COPY run_me.py /usr/src/app
 
-RUN cd /usr/src/app/
-RUN chmod +x run_me.py
-
-CMD python3 run_me.py
+# Running commands for the startup of a container.
+CMD python imap_cleaner.py && chmod 644 /etc/cron.d/container_cronjob && cron && tail -f imap_cleaner.log
