@@ -1,1 +1,0 @@
-*/5 * * * * /usr/src/app/venv/bin/python /usr/src/app/imap_cleaner.py
