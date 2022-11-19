@@ -2,11 +2,17 @@ import json
 import logging
 import sys
 import time
-
+from environs import Env
 from imapclient import IMAPClient
 from sievelib.factory import FiltersSet
 
-from config import imap_server, imap_user, imap_password, folder_list_order
+env = Env()
+env.read_env()  # read .env file, if it exists
+
+imap_server = env("IMAP_SERVER", "imap.fastmail.com")
+imap_user = env("IMAP_USER")
+imap_password = env("IMAP_PASSWORD")
+folder_list_order = env("FOLDER_LIST_ORDER")
 
 
 def server_login(mail_server, mail_user, mail_password):
@@ -58,10 +64,9 @@ def add_rule_to_filter_set(email_list, dest, rule_name, filter_set):
         c = ("Sender", ":is", e)
         criteria.append(c)
     filter_set.addfilter(rule_name, criteria, [("fileinto", dest), ])
-    # return filter_set.tosieve()
 
 
-def create_fastmail_rule(email_list, dest, rule_name, ):
+def create_fastmail_rule(email_list, rule_name, ):
     search_string = " OR from:".join(email_list)
     search_string = "from:" + search_string
     time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.localtime())
@@ -132,7 +137,7 @@ def create_mail_rules():
     rules_file.close()
 
 
-def main():
+def clean_mail():
     logging.basicConfig(
         level=logging.INFO,
         format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -157,5 +162,17 @@ def main():
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
     server.logout()
 
+
+def main(p=False):
+    clean_mail()
+    if p:
+        logging.info("running in persistent mode, sleeping for 300 seconds")
+        time.sleep(300)
+        main(True)
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    p = False
+    if len(sys.argv) > 1:
+        p = sys.argv[1]
+    sys.exit(main(p))
