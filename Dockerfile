@@ -1,6 +1,5 @@
 FROM ubuntu:22.04
 
-
 # set a directory for the app
 WORKDIR /usr/src/app
 
