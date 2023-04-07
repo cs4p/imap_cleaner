@@ -5,7 +5,7 @@ Simple Python script that will connect to an imap server and move messages from 
 ## Usage
 
 1. clone the repo and install requirements
-2. create a file, config.py, set the following values:
+2. create a .env file set the following values:
    1. imap_user = "your_user_id" 
    2. imap_password = "your_imap_password"
    3. imap_server = "your_imap_server"
