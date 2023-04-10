@@ -15,19 +15,13 @@ db_file_name='mailcleaner.db'
 imap_server = env("IMAP_SERVER", "imap.fastmail.com")
 imap_user = env("IMAP_USER")
 imap_password = env("IMAP_PASSWORD")
-folder_list_order = env("FOLDER_LIST_ORDER")
+MINUTES_BETWEEN_UPDATES = int(env("MINUTES_BETWEEN_UPDATES"))
 
 
 def server_login(mail_server, mail_user, mail_password):
     server = IMAPClient(mail_server, use_uid=True)
     server.login(mail_user, mail_password)
     return server
-
-
-def move_email(server, msg, dst_folder):
-    if not server.folder_exists(dst_folder):
-        server.create_folder(dst_folder)
-    server.move(msg, dst_folder)
 
 
 def init_db(db_file_name='mailcleaner.db'):
@@ -37,7 +31,24 @@ def init_db(db_file_name='mailcleaner.db'):
     email_address TEXT not null,
     folder        INT  not null,
     DTS           TIMESTAMP)''')
+    conn_db.row_factory = lambda cursor, row: row[0]
+    cur = conn_db.execute('SELECT MAX(DTS) from mailcleaner;')
+    max_DTS = cur.fetchone()
+    if max_DTS is None:
+        update_database(conn_db)
+    else:
+        max_DTS_datetime_object = datetime.datetime.strptime(max_DTS, '%Y-%m-%d %H:%M:%S.%f')
+        time_since_last_update = datetime.datetime.now() - max_DTS_datetime_object
+        minutes_since_last_update = int(time_since_last_update.total_seconds() / 60)
+        if minutes_since_last_update > MINUTES_BETWEEN_UPDATES:
+            update_database()
     return conn_db
+
+
+def move_email(server, msg, dst_folder):
+    if not server.folder_exists(dst_folder):
+        server.create_folder(dst_folder)
+    server.move(msg, dst_folder)
 
 
 def add_or_update_email(email_addr, folder_name, conn_db, DTS):
@@ -59,12 +70,13 @@ def update_email_list_for_folder(server, folder_name, conn_db):
         if envelope.from_ is not None:
             for addr in envelope.from_:
                 email_addr = '@'.join([str(addr.mailbox.decode()), str(addr.host.decode())]);
-                logging.info('Add or update email address %s' % email_addr)
+                logging.debug('Add or update email address %s' % email_addr)
                 add_or_update_email(email_addr, folder_name, conn_db, DTS)
 
 
 def get_email_list_for_folder(folder_name, conn_db):
-    email_filter_list = conn_db.execute("select email_address from mailcleaner where folder = ?", (folder_name,)).fetchall()
+    sql = "select email_address from mailcleaner where folder = ?"
+    email_filter_list = conn_db.execute(sql, (folder_name,)).fetchall()
     return email_filter_list
 
 
@@ -80,17 +92,10 @@ def apply_folder_filters(server, messages, email_list, folder_name):
     return counter
 
 
-def clean_mail():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-        handlers=[
-            logging.FileHandler('imap_cleaner.log'),
-            logging.StreamHandler()]
-    )
+def clean_mail(conn_db):
+    start_logging()
     logging.info('###################################################################################################')
     logging.info('Starting operation...')
-    conn_db = init_db()
     server = server_login(imap_server, imap_user, imap_password)
     select_info = server.select_folder('INBOX')
     logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
@@ -98,7 +103,6 @@ def clean_mail():
     for fldr in folder_list:
         folder_name = fldr[2]
         new_messages = server.search()
-        update_email_list_for_folder(server, folder_name, conn_db)
         email_list = get_email_list_for_folder(folder_name, conn_db)
         server.select_folder('INBOX')
         logging.info('Looking for new messages to move to ' + folder_name)
@@ -108,20 +112,12 @@ def clean_mail():
         logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
     server.logout()
-    conn_db.close()
 
 
-def update_database_only():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
-        handlers=[
-            logging.FileHandler('imap_cleaner.log'),
-            logging.StreamHandler()]
-    )
+def update_database(conn_db):
+    start_logging()
     logging.info('###################################################################################################')
     logging.info('Starting operation, update database only...')
-    conn_db = init_db()
     server = server_login(imap_server, imap_user, imap_password)
     select_info = server.select_folder('INBOX')
     logging.info('%d messages in INBOX' % select_info[b'EXISTS'])
@@ -130,11 +126,22 @@ def update_database_only():
         folder_name = fldr[2]
         new_messages = server.search()
         update_email_list_for_folder(server, folder_name, conn_db)
-    conn_db.close()
+
+
+def start_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+        handlers=[
+            logging.FileHandler('imap_cleaner.log'),
+            logging.StreamHandler()]
+    )
 
 
 def main(p=False):
-    clean_mail()
+    conn_db = init_db()
+    clean_mail(conn_db)
+    conn_db.close()
     if p:
         logging.info("running in persistent mode, sleeping for 300 seconds")
         time.sleep(300)

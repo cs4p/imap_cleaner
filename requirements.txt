@@ -2,3 +2,4 @@ IMAPClient~=2.2.0
 sievelib~=1.2.1
 six~=1.16.0
 environs~=9.5.0
+semver~=3.0.0
