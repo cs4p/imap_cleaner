@@ -30,15 +30,15 @@ def init_db(db_file_name='mailcleaner.db'):
     ID            INTEGER  not null primary key autoincrement,
     email_address TEXT not null,
     folder        INT  not null,
-    DTS           TIMESTAMP)''')
+    dts           TIMESTAMP)''')
     conn_db.row_factory = lambda cursor, row: row[0]
-    cur = conn_db.execute('SELECT MAX(DTS) from mailcleaner;')
-    max_DTS = cur.fetchone()
-    if max_DTS is None:
+    cur = conn_db.execute('SELECT MAX(dts) from mailcleaner;')
+    max_dts = cur.fetchone()
+    if max_dts is None:
         update_database(conn_db)
     else:
-        max_DTS_datetime_object = datetime.datetime.strptime(max_DTS, '%Y-%m-%d %H:%M:%S.%f')
-        time_since_last_update = datetime.datetime.now() - max_DTS_datetime_object
+        max_dts_datetime_object = datetime.datetime.strptime(max_dts, '%Y-%m-%d %H:%M:%S.%f')
+        time_since_last_update = datetime.datetime.now() - max_dts_datetime_object
         minutes_since_last_update = int(time_since_last_update.total_seconds() / 60)
         if minutes_since_last_update > MINUTES_BETWEEN_UPDATES:
             update_database(conn_db)
@@ -51,21 +51,20 @@ def move_email(server, msg, dst_folder):
     server.move(msg, dst_folder)
 
 
-def add_or_update_email(email_addr, folder_name, conn_db, DTS):
+def add_or_update_email(email_addr, folder_name, conn_db, dts):
     sql = "select email_address from mailcleaner where email_address = ?"
     cur = conn_db.execute(sql, (email_addr,)).fetchall()
     if len(cur) == 0:
-        conn_db.execute("INSERT INTO mailcleaner (email_address, folder, DTS) VALUES(?,?,?)", (email_addr, folder_name, DTS))
+        conn_db.execute("INSERT INTO mailcleaner (email_address, folder, dts) VALUES(?,?,?)", (email_addr, folder_name, dts))
         conn_db.commit()
     else:
-        conn_db.execute("UPDATE mailcleaner set folder = ?, DTS= ? where email_address = ?", (folder_name, DTS, email_addr))
+        conn_db.execute("UPDATE mailcleaner set folder = ?, dts= ? where email_address = ?", (folder_name, dts, email_addr))
         conn_db.commit()
 
 
 def update_email_list_for_folder(server, folder_name, conn_db):
     logging.info('Getting email list for folder ' + folder_name)
     server.select_folder(folder_name)
-    # TODO: Add filter here for last date
     messages = server.search()
     DTS = datetime.datetime.now()
     for msgid, data in server.fetch(messages, ['ENVELOPE']).items():
@@ -127,7 +126,7 @@ def clean_mail():
     folder_list = server.list_folders('Categories/')
     for fldr in folder_list:
         folder_name = fldr[2]
-        select_info = server.select_folder(folder_name)
+        server.select_folder(folder_name)
         existing_messages = server.search()
         for msgid, data in server.fetch(existing_messages, ['ENVELOPE']).items():
             envelope = data[b'ENVELOPE']
@@ -150,7 +149,7 @@ def update_database(conn_db):
     folder_list = server.list_folders('Categories/')
     for fldr in folder_list:
         folder_name = fldr[2]
-        new_messages = server.search()
+        server.search()
         update_email_list_for_folder(server, folder_name, conn_db)
 
 
