@@ -41,7 +41,7 @@ def init_db(db_file_name='mailcleaner.db'):
         time_since_last_update = datetime.datetime.now() - max_DTS_datetime_object
         minutes_since_last_update = int(time_since_last_update.total_seconds() / 60)
         if minutes_since_last_update > MINUTES_BETWEEN_UPDATES:
-            update_database()
+            update_database(conn_db)
     return conn_db
 
 
@@ -56,6 +56,9 @@ def add_or_update_email(email_addr, folder_name, conn_db, DTS):
     cur = conn_db.execute(sql, (email_addr,)).fetchall()
     if len(cur) == 0:
         conn_db.execute("INSERT INTO mailcleaner (email_address, folder, DTS) VALUES(?,?,?)", (email_addr, folder_name, DTS))
+        conn_db.commit()
+    else:
+        conn_db.execute("UPDATE mailcleaner set folder = ?, DTS= ? where email_address = ?", (folder_name, DTS, email_addr))
         conn_db.commit()
 
 
@@ -92,7 +95,7 @@ def apply_folder_filters(server, messages, email_list, folder_name):
     return counter
 
 
-def clean_mail(conn_db):
+def sort_mail(conn_db):
     start_logging()
     logging.info('###################################################################################################')
     logging.info('Starting operation...')
@@ -113,6 +116,29 @@ def clean_mail(conn_db):
     logging.info('Finished moving messages. %d messages remain in INBOX' % select_info[b'EXISTS'])
     server.logout()
 
+
+def clean_mail():
+    """ Sorts all old mail into the currently defined folder in the database"""
+    start_logging()
+    conn_db = init_db()
+    logging.info('###################################################################################################')
+    logging.info('Starting email cleanup...')
+    server = server_login(imap_server, imap_user, imap_password)
+    folder_list = server.list_folders('Categories/')
+    for fldr in folder_list:
+        folder_name = fldr[2]
+        select_info = server.select_folder(folder_name)
+        existing_messages = server.search()
+        for msgid, data in server.fetch(existing_messages, ['ENVELOPE']).items():
+            envelope = data[b'ENVELOPE']
+            for addr in envelope.from_:
+                email_addr = '@'.join([str(addr.mailbox.decode()), str(addr.host.decode())])
+                sql = "select folder from mailcleaner where email_address = ?"
+                email_folder = conn_db.execute(sql, (email_addr,)).fetchone()
+                if email_folder != folder_name:
+                    logging.info(' '.join(['Moved message from ', str(email_addr), ' from folder ',email_folder, ' to folder ', folder_name]))
+                    server.move(msgid, email_folder)
+    server.logout()
 
 def update_database(conn_db):
     start_logging()
@@ -140,7 +166,7 @@ def start_logging():
 
 def main(p=False):
     conn_db = init_db()
-    clean_mail(conn_db)
+    sort_mail(conn_db)
     conn_db.close()
     if p:
         logging.info("running in persistent mode, sleeping for 300 seconds")
