@@ -1,5 +1,4 @@
-import \
-    sys
+import sys
 
 import semver
 import os
@@ -35,9 +34,12 @@ def patch():
 
 def main():
     new_version = patch()
-    cmd = ('docker buildx build --platform linux/amd64,linux/arm64 --push -t cs4p/imap_cleaner:%s .' % new_version)
-    output = os.popen(cmd).read()
-    print(output)
+    cmd_list = []
+    cmd_list.append('docker buildx create --platform linux/arm64,linux/amd64 --use')
+    cmd_list.append('docker buildx build --platform linux/amd64,linux/arm64 --push -t cs4p/imap_cleaner:%s .' % new_version)
+    for cmd in cmd_list:
+        output = os.popen(cmd).read()
+        print(output)
 
 if __name__ == '__main__':
     sys.exit(main())
